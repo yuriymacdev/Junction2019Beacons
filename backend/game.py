@@ -5,6 +5,7 @@ import socketserver
 import time
 import json
 import cgi
+from urllib.parse import unquote
 
 
 class Player:
@@ -54,7 +55,7 @@ class GameSession:
     status["cumulative_dose"] = sum([p.dose for p in self.players])
     status["active_beacons"] = len([b for b in self.beacons if b.active])
     status["beacons"] = [{"bid": b.bid, "active": b.active, "power": b.power} for b in self.beacons]
-    status["time"] = time.time() - self.stime
+    status["time"] = 0 #time.time() - self.stime
 
     return json.dumps(status)
 
@@ -112,7 +113,10 @@ class ClientRequestHandler(srv.BaseHTTPRequestHandler):
         ctype, pdict = cgi.parse_header(self.headers.get('content-type'))
         if ctype == 'application/json':
           length = int(self.headers.get('content-length'))
-          data = json.loads(self.rfile.read(length).decode("UTF-8"))
+          payload = self.rfile.read(length).decode("UTF-8")
+          payload = unquote(payload[5:].replace("+", " "))
+          print(payload)
+          data = json.loads(payload)
           print(data)
         else:
           data = {"what":"update"}
