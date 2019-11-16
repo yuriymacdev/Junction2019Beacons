@@ -5,6 +5,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.Manifest;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.AssetFileDescriptor;
 import android.graphics.Bitmap;
@@ -68,8 +69,145 @@ public class MainActivity extends AppCompatActivity implements BeaconConsumer {
 
     MediaPlayer mediaPlayer;
 
-    private void playSample(int resid) {
+
+
+    // индикатор дозы, от 0 до 1 (зашкал)
+    void setDoseIndicatorValue(float value) {
+        ImageView imageView=(ImageView) findViewById(R.id.imageView);
+        imageView.setImageResource(R.drawable.ic_scale);
+
+
+        Bitmap workingBitmap = ((BitmapDrawable)imageView.getDrawable()).getBitmap();
+        Bitmap bitmap = workingBitmap.copy(Bitmap.Config.ARGB_8888, true);
+        //Canvas canvas = new Canvas(mutableBitmap);
+
+        //Bitmap bitmap = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888);
+        //Bitmap bitmap = ((BitmapDrawable)imageView.getDrawable()).getBitmap();
+        Canvas canvas = new Canvas(bitmap);
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        paint.setColor(Color.BLACK);
+        paint.setStrokeWidth(15);
+        paint.setStyle(Paint.Style.STROKE);
+
+        float initAngle = (float)3.14*1.3f;
+        float endAngle = initAngle+3.14f/2.3f;
+
+        float actualAngle = initAngle + value*(endAngle-initAngle);
+
+
+        float angle = actualAngle;
+        if(angle>=endAngle) {
+            angle = endAngle;
+        }
+        float newX = (float)cos(angle)*10;
+        float newY = (float)sin(angle)*10;
+
+
+        float pointerLength = bitmap.getWidth()/2.0f;
+        float x0 = workingBitmap.getWidth()/2;
+        float y0 = workingBitmap.getHeight()+300;
+        float x1 = x0 + (float)cos(angle)*pointerLength;
+        float y1 = y0 + (float)sin(angle)*pointerLength;
+
+
+        canvas.drawLine(x0,y0,x1,y1, paint);
+
+
+        imageView.setImageBitmap(bitmap);
+    }
+
+    void setFirstPlayerStatus(boolean isShown, boolean isAlive, String playerName) {
+        ImageView firstImage=(ImageView) findViewById(R.id.firstPlayerImageView);
+        TextView firstText=(TextView) findViewById(R.id.firstPlayerTextView);
+
+        if(isShown) {
+            firstImage.setVisibility(View.VISIBLE);
+            firstText.setVisibility(View.VISIBLE);
+
+        } else {
+            firstImage.setVisibility(View.INVISIBLE);
+            firstText.setVisibility(View.INVISIBLE);
+
+        }
+
+        if(isAlive) {
+            firstImage.setImageResource(R.drawable.ic_button2);
+        } else {
+            firstImage.setImageResource(R.drawable.ic_button1);
+        }
+
+        firstText.setText(playerName);
+
+    }
+
+    void setSecondPlayerStatus(boolean isShown, boolean isAlive, String playerName) {
+        ImageView firstImage=(ImageView) findViewById(R.id.secondPlayerImageView);
+        TextView firstText=(TextView) findViewById(R.id.secondPlayerTextView);
+
+        if(isShown) {
+            firstImage.setVisibility(View.VISIBLE);
+            firstText.setVisibility(View.VISIBLE);
+
+        } else {
+
+            firstImage.setVisibility(View.INVISIBLE);
+            firstText.setVisibility(View.INVISIBLE);
+
+        }
+
+        if(isAlive) {
+            firstImage.setImageResource(R.drawable.ic_button2);
+        } else {
+            firstImage.setImageResource(R.drawable.ic_button1);
+        }
+
+        firstText.setText(playerName);    }
+
+    // Это callback, вызывается само
+    void beaconPulseReceived(int rssi, float distanceInMeters) {
+        TextView tv1 = (TextView)findViewById(R.id.infoTextView);
+        Log.i("", "Our beacon found: " + String.valueOf(rssi));
+
+
+        tv1.setText("Warning, radiation source detected with RSSI "+String.format("%d",  rssi));
+
+    }
+
+    void makeGameOver() {
+        Intent myIntent = new Intent(this, GameOverActivity.class);
+        //myIntent.putExtra("key", value); //Optional parameters
+        this.startActivity(myIntent);
+
+    }
+
+    void restartNewGame() {
+
+    }
+
+    // val в диапазоне 0..4, где 0 - полная тишина, 4 макс треск
+    void setTreskIntensity(int val) {
+        if(val==0) {
+            if(mediaPlayer != null) {
+                mediaPlayer.stop();
+            }
+        } else if(val==1) {
+            startPlayingSample(R.raw.ic_geiger0);
+        } else if(val==2) {
+            startPlayingSample(R.raw.ic_geiger1);
+        } else if(val==3) {
+            startPlayingSample(R.raw.ic_geiger2);
+        } else if(val==4) {
+            startPlayingSample(R.raw.ic_geiger3);
+        }
+    }
+
+
+    private void startPlayingSample(int resid) {
         AssetFileDescriptor afd = this.getResources().openRawResourceFd(resid);
+
+        if(mediaPlayer != null) {
+            mediaPlayer.stop();
+        }
 
         mediaPlayer = new MediaPlayer();
         try {
@@ -214,47 +352,6 @@ public class MainActivity extends AppCompatActivity implements BeaconConsumer {
 
             }
         });
-
-//        client.get(url, new JsonHttpResponseHandler() {
-//            @Override
-//            public void onSuccess(int statusCode, PreferenceActivity.Header[] headers,
-//                                  JSONObject response) {
-//                // called when response HTTP status is "200 OK"
-//                Log.d("Bitcoin", "JSON: " + response.toString());
-//
-//                try {
-//
-//                    //The “ask” value below is a field in the JSON Object that was
-//                    //retrieved from the BitcoinAverage API. It contains the current
-//                    //bitcoin price
-//
-//                    String price = response.getString("ask");
-//
-//                    //Now we can use the value in the mPriceTextView
-//
-//
-//                } catch (Exception e) {
-//
-//                    Log.e("Bitcoin", e.toString());
-//
-//                }
-//
-//            }
-//
-//            @Override
-//            public void onFailure(int statusCode, Header[] headers, Throwable e,
-//                                  JSONObject response) {
-//
-//                // called when response HTTP status is "4XX" (eg. 401, 403, 404)
-//
-//                Log.d("Bitcoin", "Request fail! Status code: " + statusCode);
-//                Log.d("Bitcoin", "Fail response: " + response);
-//                Log.e("ERROR", e.toString());
-//
-//                Toast.makeText(MainActivity.this, "Request Failed",
-//                        Toast.LENGTH_SHORT).show();
-//            }
-//        });
     }
 
 
@@ -264,7 +361,7 @@ public class MainActivity extends AppCompatActivity implements BeaconConsumer {
 
         requestData("http://10.84.113.85:8000", "{\"what\": \"reset\"}");
 
-        playSample(R.raw.ic_geiger);
+        //playSample(R.raw.ic_geiger);
 
 
 
@@ -311,68 +408,37 @@ public class MainActivity extends AppCompatActivity implements BeaconConsumer {
 
 
 
+        setDoseIndicatorValue(0);
+        setTreskIntensity(1);
+        setFirstPlayerStatus(true, true, "Dima");
+        setSecondPlayerStatus(false, true, "Sasha");
 
-        new CountDownTimer(30000, 100) {
+        new CountDownTimer(5000, 5000) {
             public void onTick(long millisUntilFinished) {
-                ImageView imageView=(ImageView) findViewById(R.id.imageView);
-                imageView.setImageResource(R.drawable.ic_scale);
-
-
-                Bitmap workingBitmap = ((BitmapDrawable)imageView.getDrawable()).getBitmap();
-                Bitmap bitmap = workingBitmap.copy(Bitmap.Config.ARGB_8888, true);
-                //Canvas canvas = new Canvas(mutableBitmap);
-
-                //Bitmap bitmap = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888);
-                //Bitmap bitmap = ((BitmapDrawable)imageView.getDrawable()).getBitmap();
-                Canvas canvas = new Canvas(bitmap);
-                Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-                paint.setColor(Color.BLACK);
-                //canvas.drawCircle(50+(counter+=10), 50, 10, paint);
-                paint.setStrokeWidth(15);
-                paint.setStyle(Paint.Style.STROKE);
-
-                float initAngle = (float)3.14*1.3f;
-                float endAngle = initAngle+3.14f/2.3f;
-
-
-                counter+=2;
-                float angle = initAngle + (float)counter/100.0f;
-                if(angle>=endAngle) {
-                    angle = endAngle;
-                }
-                float newX = (float)cos(angle)*10;
-                float newY = (float)sin(angle)*10;
-
-
-                float pointerLength = bitmap.getWidth()/2.0f;
-                float x0 = workingBitmap.getWidth()/2;
-                float y0 = workingBitmap.getHeight()+300;
-                float x1 = x0 + (float)cos(angle)*pointerLength;
-                float y1 = y0 + (float)sin(angle)*pointerLength;
-
-
-                canvas.drawLine(x0,y0,x1,y1, paint);
-
-
-                imageView.setImageBitmap(bitmap);
             }
 
             public void onFinish() {
+                setTreskIntensity(3);
+                setDoseIndicatorValue(1.0f);
+                setFirstPlayerStatus(true, true, "Petya");
+                setSecondPlayerStatus(true, false, "Katya");
+
+                makeGameOver();
 
             }
         }.start();
 
-        ImageView firstImage=(ImageView) findViewById(R.id.firstPlayerImageView);
-        firstImage.setImageResource(R.drawable.ic_button1);
-
-        ImageView secondImage=(ImageView) findViewById(R.id.secondPlayerImageView);
-        secondImage.setImageResource(R.drawable.ic_button2);
-
-        TextView firstText=(TextView) findViewById(R.id.firstPlayerTextView);
-        firstText.setText("Mykola");
-
-        TextView secondText=(TextView) findViewById(R.id.secondPlayerTextView);
-        secondText.setText("Yuri");
+//        ImageView firstImage=(ImageView) findViewById(R.id.firstPlayerImageView);
+//        firstImage.setImageResource(R.drawable.ic_button1);
+//
+//        ImageView secondImage=(ImageView) findViewById(R.id.secondPlayerImageView);
+//        secondImage.setImageResource(R.drawable.ic_button2);
+//
+//        TextView firstText=(TextView) findViewById(R.id.firstPlayerTextView);
+//        firstText.setText("Mykola");
+//
+//        TextView secondText=(TextView) findViewById(R.id.secondPlayerTextView);
+//        secondText.setText("Yuri");
 
 
 
@@ -400,11 +466,9 @@ public class MainActivity extends AppCompatActivity implements BeaconConsumer {
 
 
                         if(beacon.getBluetoothAddress().toString().equals("D2:D7:7E:14:19:00")) {
-                            TextView tv1 = (TextView)findViewById(R.id.infoTextView);
-                            Log.i("", "Our beacon found: " + String.valueOf(beacon.getRssi()));
 
+                            beaconPulseReceived(beacon.getRssi(), (float)beacon.getDistance());
 
-                            tv1.setText("Warning, radiation source detected with RRSI "+String.format("%d",  beacon.getRssi()));
                         }
 
 
