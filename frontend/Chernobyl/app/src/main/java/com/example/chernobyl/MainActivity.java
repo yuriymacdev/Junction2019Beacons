@@ -175,6 +175,8 @@ public class MainActivity extends AppCompatActivity implements BeaconConsumer {
 
     void makeGameOver() {
         Intent myIntent = new Intent(this, GameOverActivity.class);
+        myIntent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
+
         //myIntent.putExtra("key", value); //Optional parameters
         this.startActivity(myIntent);
 
