@@ -4,6 +4,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import android.Manifest;
 import android.app.AlertDialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -22,6 +23,8 @@ import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.os.RemoteException;
 import android.preference.PreferenceActivity;
+import android.provider.Settings;
+import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.view.View;
 import android.view.Window;
@@ -42,6 +45,8 @@ import org.altbeacon.beacon.BeaconParser;
 import org.altbeacon.beacon.MonitorNotifier;
 import org.altbeacon.beacon.RangeNotifier;
 import org.altbeacon.beacon.Region;
+import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.File;
@@ -62,115 +67,129 @@ import static java.lang.Math.sin;
 
 public class MainActivity extends AppCompatActivity implements BeaconConsumer {
 
-    static int  counter =0;
+    static int counter = 0;
 
     protected static final String TAG = "RangingActivity";
     private BeaconManager beaconManager;
 
     MediaPlayer mediaPlayer;
 
+    int dev_id = 0;
+    String player_name = "John";
+
+    protected static final String server_uri = "http://10.100.52.41:8000";
 
 
     // индикатор дозы, от 0 до 1 (зашкал)
-    void setDoseIndicatorValue(float value) {
-        ImageView imageView=(ImageView) findViewById(R.id.imageView);
-        imageView.setImageResource(R.drawable.ic_scale);
+    void setDoseIndicatorValue(final float value) {
+        runOnUiThread(new Runnable() {
+            public void run() {
+                ImageView imageView = (ImageView) findViewById(R.id.imageView);
+                imageView.setImageResource(R.drawable.ic_scale);
 
 
-        Bitmap workingBitmap = ((BitmapDrawable)imageView.getDrawable()).getBitmap();
-        Bitmap bitmap = workingBitmap.copy(Bitmap.Config.ARGB_8888, true);
-        //Canvas canvas = new Canvas(mutableBitmap);
+                Bitmap workingBitmap = ((BitmapDrawable) imageView.getDrawable()).getBitmap();
+                Bitmap bitmap = workingBitmap.copy(Bitmap.Config.ARGB_8888, true);
+                //Canvas canvas = new Canvas(mutableBitmap);
 
-        //Bitmap bitmap = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888);
-        //Bitmap bitmap = ((BitmapDrawable)imageView.getDrawable()).getBitmap();
-        Canvas canvas = new Canvas(bitmap);
-        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        paint.setColor(Color.BLACK);
-        paint.setStrokeWidth(15);
-        paint.setStyle(Paint.Style.STROKE);
+                //Bitmap bitmap = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888);
+                //Bitmap bitmap = ((BitmapDrawable)imageView.getDrawable()).getBitmap();
+                Canvas canvas = new Canvas(bitmap);
+                Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+                paint.setColor(Color.BLACK);
+                paint.setStrokeWidth(15);
+                paint.setStyle(Paint.Style.STROKE);
 
-        float initAngle = (float)3.14*1.3f;
-        float endAngle = initAngle+3.14f/2.3f;
+                float initAngle = (float) 3.14 * 1.3f;
+                float endAngle = initAngle + 3.14f / 2.3f;
 
-        float actualAngle = initAngle + value*(endAngle-initAngle);
-
-
-        float angle = actualAngle;
-        if(angle>=endAngle) {
-            angle = endAngle;
-        }
-        float newX = (float)cos(angle)*10;
-        float newY = (float)sin(angle)*10;
+                float actualAngle = initAngle + value * (endAngle - initAngle);
 
 
-        float pointerLength = bitmap.getWidth()/2.0f;
-        float x0 = workingBitmap.getWidth()/2;
-        float y0 = workingBitmap.getHeight()+300;
-        float x1 = x0 + (float)cos(angle)*pointerLength;
-        float y1 = y0 + (float)sin(angle)*pointerLength;
+                float angle = actualAngle;
+                if (angle >= endAngle) {
+                    angle = endAngle;
+                }
+                float newX = (float) cos(angle) * 10;
+                float newY = (float) sin(angle) * 10;
 
 
-        canvas.drawLine(x0,y0,x1,y1, paint);
+                float pointerLength = bitmap.getWidth() / 2.0f;
+                float x0 = workingBitmap.getWidth() / 2;
+                float y0 = workingBitmap.getHeight() + 300;
+                float x1 = x0 + (float) cos(angle) * pointerLength;
+                float y1 = y0 + (float) sin(angle) * pointerLength;
 
 
-        imageView.setImageBitmap(bitmap);
+                canvas.drawLine(x0, y0, x1, y1, paint);
+
+
+                imageView.setImageBitmap(bitmap);
+            }});
     }
 
-    void setFirstPlayerStatus(boolean isShown, boolean isAlive, String playerName) {
-        ImageView firstImage=(ImageView) findViewById(R.id.firstPlayerImageView);
-        TextView firstText=(TextView) findViewById(R.id.firstPlayerTextView);
+    void setFirstPlayerStatus(final boolean isShown, final boolean isAlive, final String playerName) {
+        runOnUiThread(new Runnable() {
+            public void run() {
+                ImageView firstImage = (ImageView) findViewById(R.id.firstPlayerImageView);
+                TextView firstText = (TextView) findViewById(R.id.firstPlayerTextView);
 
-        if(isShown) {
-            firstImage.setVisibility(View.VISIBLE);
-            firstText.setVisibility(View.VISIBLE);
+                if (isShown) {
+                    firstImage.setVisibility(View.VISIBLE);
+                    firstText.setVisibility(View.VISIBLE);
 
-        } else {
-            firstImage.setVisibility(View.INVISIBLE);
-            firstText.setVisibility(View.INVISIBLE);
+                } else {
+                    firstImage.setVisibility(View.INVISIBLE);
+                    firstText.setVisibility(View.INVISIBLE);
 
-        }
+                }
 
-        if(isAlive) {
-            firstImage.setImageResource(R.drawable.ic_button2);
-        } else {
-            firstImage.setImageResource(R.drawable.ic_button1);
-        }
+                if (isAlive) {
+                    firstImage.setImageResource(R.drawable.ic_button2);
+                } else {
+                    firstImage.setImageResource(R.drawable.ic_button1);
+                }
 
-        firstText.setText(playerName);
-
+                firstText.setText(playerName);
+            }});
     }
 
-    void setSecondPlayerStatus(boolean isShown, boolean isAlive, String playerName) {
-        ImageView firstImage=(ImageView) findViewById(R.id.secondPlayerImageView);
-        TextView firstText=(TextView) findViewById(R.id.secondPlayerTextView);
+    void setSecondPlayerStatus(final boolean isShown, final boolean isAlive, final String playerName) {
+        runOnUiThread(new Runnable() {
+            public void run() {
+                ImageView firstImage = (ImageView) findViewById(R.id.secondPlayerImageView);
+                TextView firstText = (TextView) findViewById(R.id.secondPlayerTextView);
 
-        if(isShown) {
-            firstImage.setVisibility(View.VISIBLE);
-            firstText.setVisibility(View.VISIBLE);
+                if (isShown) {
+                    firstImage.setVisibility(View.VISIBLE);
+                    firstText.setVisibility(View.VISIBLE);
 
-        } else {
+                } else {
 
-            firstImage.setVisibility(View.INVISIBLE);
-            firstText.setVisibility(View.INVISIBLE);
+                    firstImage.setVisibility(View.INVISIBLE);
+                    firstText.setVisibility(View.INVISIBLE);
 
-        }
+                }
 
-        if(isAlive) {
-            firstImage.setImageResource(R.drawable.ic_button2);
-        } else {
-            firstImage.setImageResource(R.drawable.ic_button1);
-        }
+                if (isAlive) {
+                    firstImage.setImageResource(R.drawable.ic_button2);
+                } else {
+                    firstImage.setImageResource(R.drawable.ic_button1);
+                }
 
-        firstText.setText(playerName);    }
+                firstText.setText(playerName);
+            }});
+    }
 
     // Это callback, вызывается само
     void beaconPulseReceived(int rssi, float distanceInMeters) {
-        TextView tv1 = (TextView)findViewById(R.id.infoTextView);
+        TextView tv1 = (TextView) findViewById(R.id.infoTextView);
         Log.i("", "Our beacon found: " + String.valueOf(rssi));
 
+        float delta_dose = 10.f;
+        requestData(this.server_uri, String.format("{\"what\": \"add_dose\",\"name\":\"%s\",\"delta_dose\":%f}", this.player_name, delta_dose));
 
-        tv1.setText("Warning, radiation source detected with RSSI "+String.format("%d",  rssi));
-
+        tv1.setText("Warning, radiation source detected with RSSI " + String.format("%d", rssi));
     }
 
     void makeGameOver() {
@@ -188,17 +207,17 @@ public class MainActivity extends AppCompatActivity implements BeaconConsumer {
 
     // val в диапазоне 0..4, где 0 - полная тишина, 4 макс треск
     void setTreskIntensity(int val) {
-        if(val==0) {
-            if(mediaPlayer != null) {
+        if (val == 0) {
+            if (mediaPlayer != null) {
                 mediaPlayer.stop();
             }
-        } else if(val==1) {
+        } else if (val == 1) {
             startPlayingSample(R.raw.ic_geiger0);
-        } else if(val==2) {
+        } else if (val == 2) {
             startPlayingSample(R.raw.ic_geiger1);
-        } else if(val==3) {
+        } else if (val == 3) {
             startPlayingSample(R.raw.ic_geiger2);
-        } else if(val==4) {
+        } else if (val == 4) {
             startPlayingSample(R.raw.ic_geiger3);
         }
     }
@@ -207,7 +226,7 @@ public class MainActivity extends AppCompatActivity implements BeaconConsumer {
     private void startPlayingSample(int resid) {
         AssetFileDescriptor afd = this.getResources().openRawResourceFd(resid);
 
-        if(mediaPlayer != null) {
+        if (mediaPlayer != null) {
             mediaPlayer.stop();
         }
 
@@ -233,11 +252,11 @@ public class MainActivity extends AppCompatActivity implements BeaconConsumer {
             Log.e(TAG, "Unable to play audio queue do to exception: " + e.getMessage(), e);
         }
     }
+
     static String convertStreamToString(java.io.InputStream is) {
         java.util.Scanner s = new java.util.Scanner(is).useDelimiter("\\A");
         return s.hasNext() ? s.next() : "";
     }
-
 
 
     private void requestData(String url, String jsonRequestString) {
@@ -249,7 +268,6 @@ public class MainActivity extends AppCompatActivity implements BeaconConsumer {
         params.add("JSON", jsonRequestString);
 
 
-
         client.post(url, params, new ResponseHandlerInterface() {
             @Override
             public void sendResponseMessage(HttpResponse response) throws IOException {
@@ -257,6 +275,48 @@ public class MainActivity extends AppCompatActivity implements BeaconConsumer {
                 String s = convertStreamToString(response.getEntity().getContent());
                 Log.i("", s);
 
+                try {
+                    s = s.replace("\\", "");
+                    s = s.substring(1, s.length()-1);
+                    Log.i("", s);
+//                    JSONObject jo = new JSONObject(s);
+                    JSONObject jo = new JSONObject(s);
+
+                    JSONArray players = jo.getJSONArray("players");
+                    int offset = 0;
+                    for (int i = 0; i < players.length(); ++i) {
+                        JSONObject player = players.getJSONObject(i);
+                        final String name = player.getString("name");
+                        final Boolean alive = !player.getBoolean("is_dead");
+                        Log.i("kek", name);
+
+
+//                        setFirstPlayerStatus(false, alive, name);
+//                        setSecondPlayerStatus(false, alive, name);
+
+                        if (name.startsWith(player_name)) {
+                            Log.i("UserName", "It's a me, Mario");
+                            float dose = (float) (player.getDouble("dose")) / 100.f;
+                            setDoseIndicatorValue(dose);
+
+                            if (!alive)
+                                makeGameOver();
+                        }
+                        else
+                        {
+                            Log.i("UserName", "It's not a me, Louigy");
+
+                            if (offset == 0)
+                                setFirstPlayerStatus(true, alive, name);
+                            else
+                                setSecondPlayerStatus(true, alive, name);
+
+                            offset += 1;
+                        }
+                    }
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
             }
 
             @Override
@@ -281,12 +341,13 @@ public class MainActivity extends AppCompatActivity implements BeaconConsumer {
 
             @Override
             public void sendSuccessMessage(int statusCode, Header[] headers, byte[] responseBody) {
-                Log.i("HTTP REQUEST RESPONSE", responseBody.toString());
+                String response = responseBody.toString();
+                Log.i("HTTP REQUEST RESPONSE", response);
             }
 
             @Override
             public void sendFailureMessage(int statusCode, Header[] headers, byte[] responseBody, Throwable error) {
-                Log.i("sendFailureMessage", ""+String.valueOf(statusCode));
+                Log.i("sendFailureMessage", "" + String.valueOf(statusCode));
             }
 
             @Override
@@ -361,10 +422,29 @@ public class MainActivity extends AppCompatActivity implements BeaconConsumer {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        requestData("http://10.84.113.85:8000", "{\"what\": \"reset\"}");
+//        requestData("http://10.100.52.41:8000", "{\"what\": \"reset\"}");
 
         //playSample(R.raw.ic_geiger);
 
+
+//        TelephonyManager tManager = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
+//        if (checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+//            Log.i("NOT GRANTED", "ERROR");
+//            final AlertDialog.Builder builder = new AlertDialog.Builder(this);
+//            builder.setTitle("This app needs telephony access");
+//            builder.setMessage("Please grant telep access so this app can detect beacons.");
+//            builder.setPositiveButton(android.R.string.ok, null);
+//            builder.setOnDismissListener(new DialogInterface.OnDismissListener() {
+//                @Override
+//                public void onDismiss(DialogInterface dialog) {
+//                    requestPermissions(new String[]{Manifest.permission.READ_PHONE_STATE}, 0);
+//                }
+//            });
+//            builder.show();
+//            return;
+//        }
+//        String uuid = tManager.getDeviceId();
+//        Log.i("deviceUUID", uuid);
 
 
         getWindow().getDecorView().setBackgroundColor(Color.BLACK);
@@ -412,18 +492,36 @@ public class MainActivity extends AppCompatActivity implements BeaconConsumer {
 
         setDoseIndicatorValue(0);
         setTreskIntensity(1);
-        setFirstPlayerStatus(true, true, "Dima");
+        setFirstPlayerStatus(false, true, "Dima");
         setSecondPlayerStatus(false, true, "Sasha");
 
-        new CountDownTimer(5000, 5000) {
+        String uuid = Build.MODEL;
+        if (uuid.startsWith("LG")) {
+            this.dev_id = 0;
+            this.player_name = "Nick";
+        } else if (uuid.startsWith("MI")) {
+            this.dev_id = 1;
+            this.player_name = "Yuri";
+        } else {
+            this.dev_id = 2;
+            this.player_name = "Joel";
+        }
+
+        requestData(this.server_uri, String.format("{\"what\": \"join\",\"name\":\"%s\",\"team_id\":1}", this.player_name));
+
+        new CountDownTimer(5000000, 1000) {
             public void onTick(long millisUntilFinished) {
+                requestData(server_uri, "{\"what\":\"update\"}");
+//                String uuid = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+                String uuid = Build.MODEL;
+                Log.i("deviceUUID", uuid);
             }
 
             public void onFinish() {
                 setTreskIntensity(3);
                 setDoseIndicatorValue(1.0f);
-                setFirstPlayerStatus(true, true, "Petya");
-                setSecondPlayerStatus(true, false, "Katya");
+//                setFirstPlayerStatus(true, true, "Petya");
+//                setSecondPlayerStatus(true, false, "Katya");
 
                 makeGameOver();
 
@@ -464,7 +562,7 @@ public class MainActivity extends AppCompatActivity implements BeaconConsumer {
                     for(int i=0; i<beacons.size(); i++) {
                         Beacon beacon = it.next();
 
-                        //Log.i("BeaconFound", "Beacon detected: "+beacon.getDistance()+" with address: "+beacon.getBluetoothAddress());
+//                        Log.i("BeaconFound", "Beacon detected: "+beacon.getDistance()+" with address: "+beacon.getBluetoothAddress());
 
 
                         if(beacon.getBluetoothAddress().toString().equals("D2:D7:7E:14:19:00")) {
