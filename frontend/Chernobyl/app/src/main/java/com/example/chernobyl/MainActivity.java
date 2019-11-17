@@ -23,6 +23,7 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.CountDownTimer;
+import android.os.Handler;
 import android.os.RemoteException;
 import android.preference.PreferenceActivity;
 import android.provider.Settings;
@@ -59,6 +60,7 @@ import java.net.URI;
 import java.net.URL;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.Locale;
 
 import cz.msebera.android.httpclient.Header;
 import cz.msebera.android.httpclient.HttpEntity;
@@ -86,21 +88,7 @@ public class MainActivity extends AppCompatActivity implements BeaconConsumer {
 
     public static final String server_uri = "http://10.100.52.41:8000";
 
-    public void playSound(short[] buffer)
-    {
-        AudioTrack audioTrack = new AudioTrack(
-                AudioManager.STREAM_MUSIC,
-                48000,
-                AudioFormat.CHANNEL_OUT_MONO,
-                AudioFormat.ENCODING_PCM_16BIT,
-                buffer.length * 2,    //buffer length in bytes
-                AudioTrack.MODE_STATIC);
-        audioTrack.write(buffer, 0, buffer.length);
-        audioTrack.setNotificationMarkerPosition(buffer.length);
-//        audioTrack.setPlaybackPositionUpdateListener(this);
-        audioTrack.play();
-//        playing = true;
-    }
+
 
 
     // индикатор дозы, от 0 до 1 (зашкал)
@@ -214,21 +202,21 @@ public class MainActivity extends AppCompatActivity implements BeaconConsumer {
 //        delta_dose += ()
         if (rssi > -36) {
             setTreskIntensity(4);
-            delta_dose = 10;
+            delta_dose = 2*10;
         } else if (rssi > -50) {
             setTreskIntensity(3);
-            delta_dose = 4;
+            delta_dose = 2*4;
         } else if (rssi > -65) {
             setTreskIntensity(2);
-            delta_dose = 2;
+            delta_dose = 2*2;
         } else {
             setTreskIntensity(1);
-            delta_dose = 0.1f;
+            delta_dose = 0.5f;
         }
 
 //        requestData(this.server_uri, String.format("{\"what\": \"add_dose\",\"name\":\"%s\",\"delta_dose\":%f}", this.player_name, delta_dose));
 
-        tv1.setText("Warning, radiation source detected with RSSI " + String.format("%d", rssi));
+        tv1.setText("Warning, radiation level " + String.format("%.2f", 1/(distanceInMeters)-5)+" Rg/h");
     }
 
     void makeGameOver() {
@@ -307,6 +295,7 @@ public class MainActivity extends AppCompatActivity implements BeaconConsumer {
         //Everything below is part of the Android Asynchronous HTTP Client
 
         AsyncHttpClient client = new AsyncHttpClient();
+        client.setTimeout(5000);
         client.addHeader("content-type", "application/json");
         RequestParams params = new RequestParams();
         params.add("JSON", jsonRequestString);
@@ -314,12 +303,27 @@ public class MainActivity extends AppCompatActivity implements BeaconConsumer {
 
         client.post(url, params, new ResponseHandlerInterface() {
             @Override
-            public void sendResponseMessage(HttpResponse response) throws IOException {
+            public void sendResponseMessage(final HttpResponse response) throws IOException {
                 Log.i("sendResponseMessage", response.toString());
-                String s = convertStreamToString(response.getEntity().getContent());
-                Log.i("", s);
+
+
+
+//                Handler mainHandler = new Handler(getApplicationContext().getMainLooper());
+//
+//                Runnable myRunnable = new Runnable() {
+//                    @Override
+//                    public void run() {
+
+
+
+
+
 
                 try {
+                    String s = convertStreamToString(response.getEntity().getContent());
+                    Log.i("", s);
+
+
                     s = s.replace("\\", "");
                     s = s.substring(1, s.length()-1);
                     Log.i("", s);
@@ -366,9 +370,15 @@ public class MainActivity extends AppCompatActivity implements BeaconConsumer {
                     else if (offset == 1) {
                         setSecondPlayerStatus(false, false, "Player1");
                     }
-                } catch (JSONException e) {
+                } catch (Exception e) {
                     e.printStackTrace();
                 }
+
+
+//                } // This is your code
+//                };
+//                mainHandler.post(myRunnable);
+
             }
 
             @Override
@@ -399,7 +409,7 @@ public class MainActivity extends AppCompatActivity implements BeaconConsumer {
 
             @Override
             public void sendFailureMessage(int statusCode, Header[] headers, byte[] responseBody, Throwable error) {
-                Log.i("sendFailureMessage", "" + String.valueOf(statusCode));
+                Log.i("sendFailureMessage", "" + String.valueOf(statusCode) + " "+error.toString());
             }
 
             @Override
@@ -567,9 +577,21 @@ public class MainActivity extends AppCompatActivity implements BeaconConsumer {
 //            buffer[i] = (short)(sin(phi * 1000.f) * 8191.f);
 //        }
 //        playSound(buffer);
-        new CountDownTimer(5000000, 250) {
+        new CountDownTimer(5000000, 1000) {
             public void onTick(long millisUntilFinished) {
-                requestData(server_uri, String.format("{\"what\": \"add_dose\",\"name\":\"%s\",\"delta_dose\":%f}", player_name, delta_dose / 4.f));
+
+                Handler mainHandler = new Handler(getApplicationContext().getMainLooper());
+
+                Runnable myRunnable = new Runnable() {
+                    @Override
+                    public void run() {
+
+                        requestData(server_uri, String.format(Locale.US, "{\"what\": \"add_dose\",\"name\":\"%s\",\"delta_dose\":%f}", player_name, delta_dose / 2.f));
+
+                    }
+                };
+                mainHandler.post(myRunnable);
+
 //                requestData(server_uri, "{\"what\":\"update\"}");
 //                String uuid = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
                 String uuid = Build.MODEL;
