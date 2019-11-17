@@ -18,7 +18,7 @@ class Player:
     self.dose += delta_dose
 
   def isDead(self):
-    return self.dose > 10
+    return self.dose > 120
 
   def getStatus(self):
     return {"name": self.name, "team_id": self.team_id, "dose": self.dose, "is_dead": self.isDead()}
@@ -45,6 +45,9 @@ class GameSession:
     self.beacons[bid].deactivate()
 
   def join(self, name, team_id):
+    if len(list(filter(lambda p: p.name == name, self.players))) != 0:
+      return
+
     player = Player(name)
     player.team_id = team_id
     self.players.append(player)
