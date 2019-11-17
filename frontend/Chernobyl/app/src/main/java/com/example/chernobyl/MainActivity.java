@@ -15,6 +15,8 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.drawable.BitmapDrawable;
 import android.icu.util.Output;
+import android.media.AudioFormat;
+import android.media.AudioTrack;
 import android.media.MediaPlayer;
 import android.media.PlaybackParams;
 import android.os.AsyncTask;
@@ -62,6 +64,10 @@ import cz.msebera.android.httpclient.Header;
 import cz.msebera.android.httpclient.HttpEntity;
 import cz.msebera.android.httpclient.HttpResponse;
 
+import android.media.AudioManager;
+
+//import Radioactivity;
+
 import static java.lang.Math.cos;
 import static java.lang.Math.sin;
 
@@ -76,8 +82,25 @@ public class MainActivity extends AppCompatActivity implements BeaconConsumer {
 
     int dev_id = 0;
     String player_name = "John";
+    Boolean is_already_dead = false;
 
-    protected static final String server_uri = "http://10.100.52.41:8000";
+    public static final String server_uri = "http://10.100.52.41:8000";
+
+    public void playSound(short[] buffer)
+    {
+        AudioTrack audioTrack = new AudioTrack(
+                AudioManager.STREAM_MUSIC,
+                48000,
+                AudioFormat.CHANNEL_OUT_MONO,
+                AudioFormat.ENCODING_PCM_16BIT,
+                buffer.length * 2,    //buffer length in bytes
+                AudioTrack.MODE_STATIC);
+        audioTrack.write(buffer, 0, buffer.length);
+        audioTrack.setNotificationMarkerPosition(buffer.length);
+//        audioTrack.setPlaybackPositionUpdateListener(this);
+        audioTrack.play();
+//        playing = true;
+    }
 
 
     // индикатор дозы, от 0 до 1 (зашкал)
@@ -141,7 +164,6 @@ public class MainActivity extends AppCompatActivity implements BeaconConsumer {
                 } else {
                     firstImage.setVisibility(View.INVISIBLE);
                     firstText.setVisibility(View.INVISIBLE);
-
                 }
 
                 if (isAlive) {
@@ -181,13 +203,30 @@ public class MainActivity extends AppCompatActivity implements BeaconConsumer {
             }});
     }
 
+    float delta_dose = 0.1f;
+
     // Это callback, вызывается само
     void beaconPulseReceived(int rssi, float distanceInMeters) {
         TextView tv1 = (TextView) findViewById(R.id.infoTextView);
         Log.i("", "Our beacon found: " + String.valueOf(rssi));
 
-        float delta_dose = 10.f;
-        requestData(this.server_uri, String.format("{\"what\": \"add_dose\",\"name\":\"%s\",\"delta_dose\":%f}", this.player_name, delta_dose));
+//        delta_dose =
+//        delta_dose += ()
+        if (rssi > -36) {
+            setTreskIntensity(4);
+            delta_dose = 10;
+        } else if (rssi > -50) {
+            setTreskIntensity(3);
+            delta_dose = 4;
+        } else if (rssi > -65) {
+            setTreskIntensity(2);
+            delta_dose = 2;
+        } else {
+            setTreskIntensity(1);
+            delta_dose = 0.1f;
+        }
+
+//        requestData(this.server_uri, String.format("{\"what\": \"add_dose\",\"name\":\"%s\",\"delta_dose\":%f}", this.player_name, delta_dose));
 
         tv1.setText("Warning, radiation source detected with RSSI " + String.format("%d", rssi));
     }
@@ -205,8 +244,13 @@ public class MainActivity extends AppCompatActivity implements BeaconConsumer {
 
     }
 
+    int tresk_itencity = -1;
+
     // val в диапазоне 0..4, где 0 - полная тишина, 4 макс треск
     void setTreskIntensity(int val) {
+        if (val == tresk_itencity)
+            return;
+
         if (val == 0) {
             if (mediaPlayer != null) {
                 mediaPlayer.stop();
@@ -299,11 +343,11 @@ public class MainActivity extends AppCompatActivity implements BeaconConsumer {
                             float dose = (float) (player.getDouble("dose")) / 100.f;
                             setDoseIndicatorValue(dose);
 
-                            if (!alive)
+                            if (!alive && !is_already_dead) {
                                 makeGameOver();
-                        }
-                        else
-                        {
+                                is_already_dead = true;
+                            }
+                        } else {
                             Log.i("UserName", "It's not a me, Louigy");
 
                             if (offset == 0)
@@ -313,6 +357,14 @@ public class MainActivity extends AppCompatActivity implements BeaconConsumer {
 
                             offset += 1;
                         }
+                    }
+
+                    if (offset == 0) {
+                        setFirstPlayerStatus(false, false, "Player1");
+                        setSecondPlayerStatus(false, false, "Player2");
+                    }
+                    else if (offset == 1) {
+                        setSecondPlayerStatus(false, false, "Player1");
                     }
                 } catch (JSONException e) {
                     e.printStackTrace();
@@ -509,9 +561,16 @@ public class MainActivity extends AppCompatActivity implements BeaconConsumer {
 
         requestData(this.server_uri, String.format("{\"what\": \"join\",\"name\":\"%s\",\"team_id\":1}", this.player_name));
 
-        new CountDownTimer(5000000, 1000) {
+//        short buffer[] = new short[48000];
+//        for (int i = 0; i < buffer.length; ++i) {
+//            float phi = 3.1415926f * 2.f * (float)i / 48000.f;
+//            buffer[i] = (short)(sin(phi * 1000.f) * 8191.f);
+//        }
+//        playSound(buffer);
+        new CountDownTimer(5000000, 250) {
             public void onTick(long millisUntilFinished) {
-                requestData(server_uri, "{\"what\":\"update\"}");
+                requestData(server_uri, String.format("{\"what\": \"add_dose\",\"name\":\"%s\",\"delta_dose\":%f}", player_name, delta_dose / 4.f));
+//                requestData(server_uri, "{\"what\":\"update\"}");
 //                String uuid = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
                 String uuid = Build.MODEL;
                 Log.i("deviceUUID", uuid);
@@ -547,6 +606,7 @@ public class MainActivity extends AppCompatActivity implements BeaconConsumer {
     protected void onDestroy() {
         super.onDestroy();
         beaconManager.unbind(this);
+        requestData(this.server_uri, String.format("{\"what\": \"unjoin\",\"name\":\"%s\",\"team_id\":1}", this.player_name));
     }
     @Override
     public void onBeaconServiceConnect() {

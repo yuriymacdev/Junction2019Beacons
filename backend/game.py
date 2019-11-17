@@ -18,7 +18,7 @@ class Player:
     self.dose += delta_dose
 
   def isDead(self):
-    return self.dose > 120
+    return self.dose > 100
 
   def getStatus(self):
     return {"name": self.name, "team_id": self.team_id, "dose": self.dose, "is_dead": self.isDead()}
@@ -52,6 +52,13 @@ class GameSession:
     player.team_id = team_id
     self.players.append(player)
 
+  def unjoin(self, name, team_id):
+    named_players = list(filter(lambda p: p.name == name, self.players))
+    if len(named_players) == 0:
+      return
+    else:
+      self.players.remove(named_players[0])
+
   def getStatus(self):
     status = dict()
     status["players"] = [p.getStatus() for p in self.players]
@@ -76,13 +83,20 @@ class GameSession:
     self.beacons = []
     self.stime = time.time()
 
+  def allDead(self):
+    return len([p for p in self.players if not p.isDead()]) == 0
+
   def handleRequest(self, request):
     if request["what"] == "add_dose":
       self.addDose(request["name"], request["delta_dose"])
     elif request["what"] == "deactivate":
       self.deactivateBeacon(request["bid"])
     elif request["what"] == "join":
+      if self.allDead():
+        self.reset();
       self.join(request["name"], request["team_id"])
+    elif request["what"] == "unjoin":
+      self.unjoin(request["name"], request["team_id"])
     elif request["what"] == "reset":
       self.reset()
     elif request["what"] == "start":
